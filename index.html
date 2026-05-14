@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>校付通 × 微企付 · 缴费支付交互 Demo</title>
+<style>
+:root {
+  --wqf-green:#07C160; --wqf-green-dark:#06A24E; --wqf-green-light:#E8FFF0;
+  --xft-blue:#3F8AE0; --xft-blue-light:#EAF3FC;
+  --icbc-red:#C8000A; --icbc-red-dark:#A6000A;
+  --red:#FA5151; --orange:#FA9D3B; --warning-bg:#FFF6E0;
+  --text-1:rgba(0,0,0,.9); --text-2:rgba(0,0,0,.55); --text-3:rgba(0,0,0,.3); --text-4:rgba(0,0,0,.15);
+  --bg:#F2F3F5; --bg-2:#EDEDED; --card:#FFFFFF; --border:rgba(0,0,0,.06);
+  --radius:8px; --radius-lg:12px; --radius-xl:16px;
+  --font:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;
+  --shadow-card:0 1px 0 rgba(0,0,0,.03);
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+html,body { height:100%; font-family:var(--font); color:var(--text-1); -webkit-font-smoothing:antialiased; background:#EBEDF0; overflow-x:hidden; }
+button { font-family:inherit; cursor:pointer; }
+
+/* ============ 整体布局 ============ */
+.stage { min-height:100vh; display:flex; flex-direction:column; align-items:center; padding:24px 16px 80px; gap:18px; }
+.stage-head { width:100%; max-width:1280px; display:flex; flex-direction:column; gap:6px; }
+.stage-title { font-size:18px; font-weight:600; color:var(--text-1); }
+.stage-sub { font-size:13px; color:var(--text-2); line-height:1.7; }
+.stage-tip { font-size:12px; color:var(--text-3); margin-top:2px; }
+
+.phones {
+  display:grid; gap:20px; width:100%; max-width:1320px;
+  grid-template-columns:repeat(auto-fit, minmax(320px, 1fr));
+  justify-items:center;
+}
+
+.phone {
+  width:100%; max-width:380px; height:760px;
+  background:#fff; border-radius:34px; overflow:hidden; position:relative;
+  box-shadow:0 18px 50px rgba(0,0,0,.14), 0 0 0 1px rgba(0,0,0,.06);
+  display:flex; flex-direction:column;
+}
+.phone-cap {
+  position:absolute; left:50%; top:8px; transform:translateX(-50%);
+  width:120px; height:24px; background:#000; border-radius:20px; z-index:30;
+}
+.statusbar {
+  height:36px; padding:6px 22px 0 22px; display:flex; align-items:center; justify-content:space-between;
+  font-size:13px; font-weight:600; color:var(--text-1); z-index:2;
+}
+.statusbar.dark { color:#fff; }
+.screen { flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; background:var(--bg); position:relative; }
+.screen::-webkit-scrollbar { display:none; }
+
+/* ============ 通用导航 ============ */
+.nav {
+  height:44px; display:flex; align-items:center; justify-content:space-between;
+  padding:0 14px; background:#fff; position:sticky; top:0; z-index:5;
+  border-bottom:0.5px solid var(--border);
+}
+.nav .nav-l, .nav .nav-r { width:60px; display:flex; align-items:center; gap:4px; color:var(--text-1); }
+.nav .nav-r { justify-content:flex-end; color:var(--text-2); }
+.nav .nav-t { font-size:17px; font-weight:600; }
+.cell { padding:14px 16px; display:flex; align-items:center; justify-content:space-between; border-bottom:0.5px solid var(--border); }
+.cell:last-child { border-bottom:none; }
+.cell .l { font-size:15px; color:var(--text-1); }
+.cell .r { font-size:15px; color:var(--text-3); max-width:60%; text-align:right; }
+
+/* ============ 标牌 ============ */
+.step-tag {
+  position:absolute; top:-12px; left:50%; transform:translateX(-50%);
+  background:var(--wqf-green); color:#fff; font-size:12px; font-weight:600;
+  padding:4px 12px; border-radius:14px; box-shadow:0 4px 10px rgba(7,193,96,.25); z-index:40; white-space:nowrap;
+}
+.step-tag.blue { background:var(--xft-blue); box-shadow:0 4px 10px rgba(63,138,224,.25); }
+.step-tag.red { background:var(--icbc-red); box-shadow:0 4px 10px rgba(200,0,10,.25); }
+.phone-wrap { position:relative; padding-top:18px; width:100%; max-width:380px; }
+
+/* ============ Page 1: 我的校付通 ============ */
+.p1 .head-note { font-size:13px; color:var(--text-2); padding:14px 16px 6px; }
+.p1 .kid-card { background:#fff; margin-top:10px; box-shadow:var(--shadow-card); }
+.p1 .kid-head { padding:12px 16px; display:flex; justify-content:space-between; align-items:center; border-bottom:0.5px solid var(--border); }
+.p1 .kid-name { color:var(--text-3); font-size:14px; }
+.p1 .kid-edit { color:var(--xft-blue); font-size:14px; font-weight:500; }
+.p1 .footer-pay { padding:18px 24px 26px; }
+.p1 .footer-pay .btn-primary {
+  width:100%; height:50px; border-radius:30px; border:none; background:#3F8AE0; color:#fff;
+  font-size:17px; font-weight:600; box-shadow:0 6px 14px rgba(63,138,224,.35);
+}
+
+/* ============ Page 2: 微信会话列表 ============ */
+.p2 .wxnav { background:#EDEDED; padding:8px 16px 12px; position:sticky; top:0; z-index:5; border-bottom:0.5px solid var(--border); }
+.p2 .wxnav-row { display:flex; justify-content:space-between; align-items:center; padding:4px 0 10px; font-size:17px; font-weight:600; }
+.p2 .wxnav-add { width:24px; height:24px; border-radius:50%; background:rgba(0,0,0,.04); display:inline-flex; align-items:center; justify-content:center; font-size:18px; color:var(--text-2); }
+.p2 .wxsearch {
+  height:34px; background:rgba(0,0,0,.05); border-radius:8px; display:flex; align-items:center; justify-content:center; gap:6px;
+  color:var(--text-3); font-size:14px;
+}
+.p2 .chat-list { background:#fff; }
+.p2 .chat-item { display:flex; gap:12px; padding:12px 16px; align-items:flex-start; border-bottom:0.5px solid var(--border); position:relative; cursor:pointer; }
+.p2 .chat-avatar { width:44px; height:44px; border-radius:8px; background:#F2F3F5; flex-shrink:0; display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden; font-size:11px; color:var(--text-2); }
+.p2 .chat-avatar.xft { background:#fff; border:1px solid #eee; padding:4px; }
+.p2 .chat-avatar.xft .logo { font-weight:700; color:#3F8AE0; font-size:13px; letter-spacing:1px; }
+.p2 .chat-avatar.xft .url { position:absolute; bottom:2px; font-size:8px; color:#9aa0a6; }
+.p2 .chat-main { flex:1; min-width:0; padding-top:2px; }
+.p2 .chat-top { display:flex; justify-content:space-between; align-items:center; }
+.p2 .chat-name { font-size:16px; color:var(--text-1); font-weight:500; }
+.p2 .chat-time { font-size:12px; color:var(--text-3); }
+.p2 .chat-msg { font-size:13px; color:var(--text-2); margin-top:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.p2 .chat-badge {
+  position:absolute; top:8px; left:48px; background:var(--red); color:#fff; min-width:18px; height:18px;
+  border-radius:9px; display:flex; align-items:center; justify-content:center; font-size:11px; padding:0 5px; font-weight:600;
+}
+.p2 .placeholder-row { display:flex; gap:12px; padding:12px 16px; align-items:flex-start; border-bottom:0.5px solid var(--border); background:#fff; }
+.p2 .placeholder-bar { flex:1; display:flex; flex-direction:column; gap:6px; padding-top:6px; }
+.p2 .placeholder-bar i { display:block; height:10px; background:#E5E6EB; border-radius:3px; }
+.p2 .placeholder-bar i:nth-child(2) { width:60%; }
+
+/* ============ Page 3: 校付通会话内 ============ */
+.p3 .nav { background:#EDEDED; }
+.p3 .nav .nav-l { color:var(--text-1); font-size:13px; }
+.p3 .nav .nav-l .back { border:1px solid var(--text-3); border-radius:14px; padding:2px 8px; font-size:12px; color:var(--text-1); }
+.p3 .nav .nav-t { font-size:16px; font-weight:600; }
+.p3 .msg-card { background:#fff; margin:12px 12px 0; border-radius:8px; box-shadow:var(--shadow-card); cursor:pointer; }
+.p3 .msg-head { padding:14px 16px 8px; display:flex; align-items:center; justify-content:space-between; border-bottom:0.5px solid var(--border); }
+.p3 .msg-title { font-size:16px; font-weight:600; color:var(--text-1); }
+.p3 .msg-more { font-size:18px; color:var(--text-3); letter-spacing:1px; }
+.p3 .msg-sub { padding:8px 16px 12px; font-size:14px; color:var(--text-1); line-height:1.6; border-bottom:0.5px solid var(--border); }
+.p3 .msg-rows { padding:10px 16px 12px; display:flex; flex-direction:column; gap:8px; }
+.p3 .msg-row { display:flex; gap:10px; font-size:13px; }
+.p3 .msg-row .k { color:var(--text-3); min-width:64px; }
+.p3 .msg-row .v { color:var(--xft-blue); flex:1; }
+.p3 .msg-row .v.txt { color:var(--text-1); }
+.p3 .msg-foot { padding:12px 16px; border-top:0.5px solid var(--border); display:flex; align-items:center; justify-content:space-between; color:var(--text-1); font-size:14px; }
+.p3 .msg-foot .arrow { color:var(--text-3); }
+.p3 .finger { position:absolute; right:34px; top:54%; font-size:30px; transform:rotate(-15deg); }
+
+/* ============ Page 4: 缴费详情 ============ */
+.p4 .nav { background:#fff; }
+.p4 .breadcrumb { background:var(--xft-blue); color:#fff; padding:10px 16px; display:flex; justify-content:space-between; font-size:13px; }
+.p4 .pay-h1 { padding:18px 16px 4px; font-size:19px; font-weight:600; color:var(--text-1); line-height:1.4; }
+.p4 .pay-sub { padding:0 16px; color:var(--text-3); font-size:12px; }
+.p4 .pay-items { margin:14px; padding:14px; border-radius:10px; background:#F6F8FA; }
+.p4 .pay-items-head { display:flex; justify-content:space-between; font-size:14px; color:var(--text-1); margin-bottom:12px; }
+.p4 .pay-items-head .total { color:var(--red); font-weight:600; }
+.p4 .pay-item { display:flex; gap:10px; align-items:flex-start; padding:8px 0; border-top:1px dashed rgba(0,0,0,.06); cursor:pointer; }
+.p4 .pay-item:first-of-type { border-top:none; }
+.p4 .pay-radio { width:18px; height:18px; border-radius:50%; border:1.5px solid var(--text-3); flex-shrink:0; margin-top:3px; display:flex; align-items:center; justify-content:center; }
+.p4 .pay-radio.checked { background:var(--red); border-color:var(--red); }
+.p4 .pay-radio.checked::after { content:""; width:8px; height:8px; border-radius:50%; background:#fff; }
+.p4 .pay-item .info .price { color:var(--red); font-size:14px; font-weight:500; }
+.p4 .pay-item .info .name { color:var(--text-1); font-size:14px; margin-top:2px; }
+.p4 .pay-notice { padding:14px 16px; font-size:14px; color:var(--text-1); }
+.p4 .footer-bar { position:absolute; left:0; right:0; bottom:0; display:flex; height:54px; background:#fff; border-top:0.5px solid var(--border); }
+.p4 .footer-bar .btn { flex:1; display:flex; align-items:center; justify-content:center; font-size:16px; cursor:pointer; }
+.p4 .footer-bar .btn.no { color:var(--text-2); background:#F2F3F5; }
+.p4 .footer-bar .btn.go { color:#fff; background:var(--xft-blue); }
+
+/* ============ Page 5: 订单确认 ============ */
+.p5 .nav .nav-t { font-size:17px; font-weight:600; }
+.p5 .stu { background:#fff; padding:14px 16px; display:flex; gap:14px; align-items:center; border-bottom:0.5px solid var(--border); }
+.p5 .stu-avatar { width:48px; height:48px; border-radius:50%; background:#D6EAF8; display:flex; align-items:center; justify-content:center; }
+.p5 .stu-avatar svg { width:34px; height:34px; }
+.p5 .stu-name { font-size:16px; color:var(--text-1); font-weight:500; }
+.p5 .stu-school { font-size:13px; color:var(--text-3); margin-top:2px; }
+.p5 .order-box { background:#fff; margin-top:10px; }
+.p5 .order-row { display:flex; padding:14px 16px; border-bottom:0.5px solid var(--border); align-items:center; }
+.p5 .order-row .k { font-size:14px; color:var(--text-1); min-width:84px; }
+.p5 .order-row .v { flex:1; font-size:14px; color:var(--text-1); }
+.p5 .order-row .v.price { color:var(--red); font-size:16px; text-align:right; font-weight:500; }
+.p5 .order-row .hint { color:var(--text-3); font-size:12px; text-align:right; }
+.p5 .order-row .colr { flex:1; text-align:right; }
+.p5 .switch-box { background:#fff; margin-top:10px; padding:14px 16px; display:flex; justify-content:space-between; align-items:center; }
+.p5 .switch-text .t { font-size:15px; color:var(--text-1); }
+.p5 .switch-text .s { font-size:12px; color:var(--text-3); margin-top:4px; }
+.p5 .switch { width:44px; height:26px; border-radius:13px; background:#E5E6EB; position:relative; }
+.p5 .switch::after { content:""; position:absolute; left:2px; top:2px; width:22px; height:22px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.2); }
+.p5 .order-foot { position:absolute; left:0; right:0; bottom:0; display:flex; gap:12px; padding:12px 16px 20px; background:#fff; }
+.p5 .order-foot .btn { flex:1; height:42px; border-radius:21px; font-size:15px; font-weight:500; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+.p5 .order-foot .btn.back { background:#fff; color:var(--xft-blue); border:1px solid var(--xft-blue); }
+.p5 .order-foot .btn.go { background:var(--xft-blue); color:#fff; }
+
+/* ============ Page 6: 校付通收银台 ============ */
+.p6 .nav { background:#fff; }
+.p6 .nav .nav-t { font-size:17px; font-weight:600; }
+.p6 .biz { background:#fff; padding:20px 16px 18px; border-bottom:8px solid var(--bg); text-align:center; }
+.p6 .biz-name { font-size:17px; color:var(--text-1); font-weight:600; line-height:1.4; }
+.p6 .biz-sub { font-size:12px; color:var(--text-3); margin-top:6px; }
+.p6 .biz-amt { display:flex; justify-content:space-between; align-items:center; margin-top:18px; padding-top:16px; border-top:0.5px dashed var(--border); }
+.p6 .biz-amt .k { font-size:13px; color:var(--text-3); }
+.p6 .biz-amt .v { font-size:18px; color:var(--red); font-weight:600; }
+.p6 .method-card { background:#fff; padding:14px 16px 6px; }
+.p6 .method-title { font-size:13px; color:var(--text-3); margin-bottom:6px; }
+.p6 .method-list .method-row { display:flex; align-items:flex-start; gap:12px; padding:14px 4px; border-bottom:0.5px solid var(--border); cursor:pointer; }
+.p6 .method-list .method-row:last-child { border-bottom:none; }
+.p6 .method-logo { width:40px; height:40px; border-radius:50%; background:#fff; border:1px solid var(--border); padding:5px; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:2px; }
+.p6 .method-logo img { width:30px; height:30px; object-fit:contain; }
+.p6 .method-logo.wx { background:var(--wqf-green); border-color:var(--wqf-green); }
+.p6 .method-logo.wx svg { width:22px; height:22px; }
+.p6 .method-info { flex:1; min-width:0; padding-top:1px; }
+.p6 .method-name { font-size:15px; color:var(--text-1); font-weight:500; line-height:1.5; }
+.p6 .method-tag { display:inline-block; font-size:11px; color:#fff; background:var(--red); border-radius:4px; padding:2px 8px; margin-left:6px; vertical-align:middle; font-weight:500; letter-spacing:.2px; }
+.p6 .method-desc { font-size:12px; color:var(--text-3); margin-top:4px; line-height:1.5; }
+.p6 .radio { width:22px; height:22px; border-radius:50%; border:1.5px solid #D8D8D8; flex-shrink:0; display:flex; align-items:center; justify-content:center; transition:.2s; }
+.p6 .radio.checked { background:var(--wqf-green); border-color:var(--wqf-green); }
+.p6 .radio.checked::after { content:""; width:10px; height:5px; border-left:1.6px solid #fff; border-bottom:1.6px solid #fff; transform:rotate(-45deg); margin-bottom:2px; }
+.p6 .expand-btn { text-align:center; padding:12px 0 14px; font-size:13px; color:var(--text-2); display:flex; align-items:center; justify-content:center; gap:4px; cursor:pointer; }
+.p6 .expand-btn .ic { width:0; height:0; border-left:5px solid transparent; border-right:5px solid transparent; border-top:6px solid var(--text-3); transition:.2s; }
+.p6 .expand-btn.open .ic { transform:rotate(180deg); }
+.p6 .legacy { display:none; }
+.p6 .legacy.open { display:block; }
+.p6 .legacy .method-row:first-child { border-top:0.5px solid var(--border); }
+.p6 .brand-foot { padding:18px 16px 90px; text-align:center; opacity:.45; }
+.p6 .brand-foot .row { display:flex; justify-content:center; align-items:center; gap:10px; color:var(--text-3); font-size:12px; }
+.p6 .brand-foot .row .logo { font-weight:700; color:#3F8AE0; }
+.p6 .footer-bar { position:absolute; left:0; right:0; bottom:0; background:var(--wqf-green); color:#fff; height:52px; display:flex; align-items:center; justify-content:center; font-size:17px; font-weight:600; cursor:pointer; }
+
+/* ============ Page 7: 微企付安全支付（截图1 - 第1屏）============ */
+.p7 .nav { background:#fff; }
+.p7 .nav .back { font-size:22px; color:var(--text-1); cursor:pointer; }
+.p7 .nav .nav-t { font-size:17px; font-weight:600; }
+.p7 .screen { background:#F4F5F7; padding-bottom:90px; }
+.p7 .biz-head { background:#F4F5F7; padding:18px 16px 8px; text-align:center; }
+.p7 .biz-name { font-size:14px; color:var(--text-2); }
+.p7 .biz-amt { font-size:40px; font-weight:700; color:var(--text-1); margin-top:4px; letter-spacing:-1px; }
+.p7 .biz-amt .yen { font-size:24px; vertical-align:8px; margin-right:1px; font-weight:700; }
+.p7 .payer-card { background:#fff; margin:14px 12px 10px; border-radius:12px; padding:14px 16px; display:flex; align-items:center; justify-content:space-between; }
+.p7 .payer-l { display:flex; align-items:center; gap:14px; }
+.p7 .payer-label { font-size:15px; color:var(--text-2); }
+.p7 .payer-name { font-size:17px; color:var(--text-1); font-weight:600; }
+.p7 .payer-tag { background:#FFF3E0; color:#FF9800; font-size:12px; padding:2px 6px; border-radius:4px; font-weight:600; margin-left:2px; }
+.p7 .payer-r { display:flex; align-items:center; gap:8px; }
+.p7 .payer-dot { width:8px; height:8px; border-radius:50%; background:var(--red); }
+.p7 .payer-arrow { color:var(--text-3); font-size:18px; }
+.p7 .pay-section-bar { display:flex; align-items:center; justify-content:space-between; padding:10px 18px 8px; }
+.p7 .pay-section-bar .l { font-size:13px; color:var(--text-3); }
+.p7 .pay-section-bar .r { font-size:13px; color:var(--xft-blue); }
+.p7 .wx-card { background:#fff; margin:0 12px 10px; border-radius:12px; padding:14px 16px; display:flex; align-items:center; gap:14px; cursor:pointer; }
+.p7 .wx-icon { width:32px; height:32px; border-radius:8px; background:var(--wqf-green); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.p7 .wx-icon svg { width:22px; height:22px; }
+.p7 .wx-name { flex:1; font-size:15px; color:var(--text-1); font-weight:500; }
+.p7 .bank-card { background:#fff; margin:0 12px 10px; border-radius:12px; overflow:hidden; }
+.p7 .bank-head { display:flex; align-items:center; gap:14px; padding:14px 16px; }
+.p7 .bank-head-icon { width:32px; height:32px; border-radius:6px; background:#3F8AE0; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.p7 .bank-head-icon svg { width:18px; height:14px; color:#fff; }
+.p7 .bank-head-title { font-size:15px; color:var(--text-1); font-weight:600; }
+.p7 .bank-row { display:flex; align-items:center; gap:14px; padding:14px 16px; cursor:pointer; position:relative; }
+.p7 .bank-row + .bank-row::before { content:""; position:absolute; left:62px; right:16px; top:0; height:0.5px; background:var(--border); }
+.p7 .bank-logo { width:32px; height:32px; border-radius:50%; overflow:hidden; flex-shrink:0; background:#fff; display:flex; align-items:center; justify-content:center; }
+.p7 .bank-logo img { width:30px; height:30px; object-fit:contain; }
+.p7 .bank-name { flex:1; font-size:15px; color:var(--text-1); font-weight:500; }
+.p7 .show-more { text-align:center; padding:14px 0; font-size:14px; color:var(--xft-blue); cursor:pointer; border-top:0.5px solid var(--border); }
+.p7 .radio { width:22px; height:22px; border-radius:50%; border:1.5px solid #D8D8D8; flex-shrink:0; display:flex; align-items:center; justify-content:center; transition:.2s; }
+.p7 .radio.checked { background:var(--wqf-green); border-color:var(--wqf-green); }
+.p7 .radio.checked::after { content:""; width:10px; height:5px; border-left:1.6px solid #fff; border-bottom:1.6px solid #fff; transform:rotate(-45deg); margin-bottom:2px; }
+.p7 .pay-btn-wrap { position:absolute; left:0; right:0; bottom:14px; padding:0 24px; }
+.p7 .pay-btn { width:100%; height:48px; border-radius:24px; background:var(--wqf-green); color:#fff; font-size:17px; font-weight:600; border:none; cursor:pointer; box-shadow:0 6px 14px rgba(7,193,96,.3); }
+
+/* ============ Page 8: 工商银行 · 安全支付（截图1 - 第2屏）============ */
+.p8 .icbc-nav { background:linear-gradient(180deg,#E60012 0%, #C8000A 100%); color:#fff; height:52px; display:flex; align-items:center; justify-content:center; gap:6px; position:sticky; top:0; z-index:5; padding:0 14px; }
+.p8 .icbc-nav .seal { width:22px; height:22px; border-radius:50%; background:#fff; color:#E60012; font-size:11px; font-weight:800; display:flex; align-items:center; justify-content:center; }
+.p8 .icbc-nav .title { font-size:17px; font-weight:600; }
+.p8 .secure-bar { background:#E8FFF0; color:var(--wqf-green); font-size:13px; padding:10px 16px; display:flex; align-items:center; gap:6px; border-bottom:0.5px solid rgba(7,193,96,.2); }
+.p8 .secure-bar svg { width:14px; height:14px; }
+.p8 .icbc-table { background:#fff; }
+.p8 .icbc-row { display:flex; justify-content:space-between; align-items:center; padding:16px 16px; border-bottom:0.5px solid var(--border); }
+.p8 .icbc-row .k { font-size:15px; color:var(--text-1); }
+.p8 .icbc-row .v { font-size:15px; color:var(--text-1); text-align:right; max-width:60%; }
+.p8 .icbc-row .v.amt { color:var(--red); font-weight:600; }
+.p8 .icbc-warn { background:var(--warning-bg); color:#A06800; padding:12px 16px; font-size:13px; display:flex; gap:8px; align-items:center; margin-top:18px; }
+.p8 .icbc-warn .ic { width:18px; height:18px; border-radius:50%; background:var(--orange); color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; flex-shrink:0; }
+.p8 .footer-bar { position:absolute; left:0; right:0; bottom:0; background:var(--wqf-green); color:#fff; height:52px; display:flex; align-items:center; justify-content:center; font-size:17px; font-weight:600; cursor:pointer; }
+
+/* ============ Page 9: 工行支付密码（截图1 - 第3屏）============ */
+.p9 .nav { background:#fff; }
+.p9 .body { padding:20px 16px 0; text-align:center; background:#fff; min-height:calc(100% - 44px); display:flex; flex-direction:column; }
+.p9 .icbc-pill { display:inline-flex; align-self:center; align-items:center; gap:6px; padding:8px 14px; border-radius:18px; background:linear-gradient(180deg,#E60012 0%, #C8000A 100%); color:#fff; font-size:14px; font-weight:600; box-shadow:0 4px 10px rgba(230,0,18,.25); }
+.p9 .icbc-pill .seal { width:18px; height:18px; border-radius:50%; background:#fff; color:#E60012; font-size:10px; font-weight:800; display:flex; align-items:center; justify-content:center; }
+.p9 .pwd-tip { font-size:14px; color:var(--text-2); margin-top:18px; }
+.p9 .pwd-amt { font-size:32px; font-weight:700; margin-top:14px; letter-spacing:-0.5px; }
+.p9 .pwd-amt .yen { font-size:20px; vertical-align:5px; margin-right:2px; }
+.p9 .pwd-merchant { font-size:13px; color:var(--text-2); margin-top:6px; }
+.p9 .pwd-dots { display:flex; justify-content:center; gap:10px; margin:18px 0 8px; }
+.p9 .pwd-dots i { width:38px; height:42px; border:1px solid var(--border); border-radius:6px; display:flex; align-items:center; justify-content:center; }
+.p9 .pwd-dots i.filled::after { content:""; width:9px; height:9px; border-radius:50%; background:#000; }
+.p9 .pwd-feed { display:flex; align-items:center; justify-content:center; gap:6px; font-size:13px; color:var(--wqf-green); margin-top:6px; }
+.p9 .pwd-feed .dot { width:7px; height:7px; border-radius:50%; background:var(--wqf-green); }
+.p9 .keypad { display:grid; grid-template-columns:repeat(3,1fr); margin-top:auto; border-top:0.5px solid var(--border); }
+.p9 .keypad .key { background:#fff; height:54px; border-right:0.5px solid var(--border); border-bottom:0.5px solid var(--border); display:flex; align-items:center; justify-content:center; font-size:24px; color:var(--text-1); font-weight:500; }
+.p9 .keypad .key:nth-child(3n) { border-right:none; }
+.p9 .keypad .key.disabled { background:#F4F5F7; }
+.p9 .keypad .key svg { width:24px; height:24px; opacity:.6; }
+
+/* ============ Page 10: 支付成功（截图2）============ */
+.p10 .nav { background:#fff; }
+.p10 .nav .nav-t { font-size:17px; font-weight:600; }
+.p10 .succ-body { padding:30px 16px 14px; background:var(--bg); flex:1; }
+.p10 .succ-icon-wrap { display:flex; justify-content:center; margin-bottom:14px; }
+.p10 .succ-icon { width:96px; height:96px; border-radius:50%; background:var(--wqf-green-light); display:flex; align-items:center; justify-content:center; }
+.p10 .succ-icon::after { content:""; width:36px; height:18px; border-left:4px solid var(--wqf-green); border-bottom:4px solid var(--wqf-green); transform:rotate(-45deg); margin-bottom:8px; }
+.p10 .succ-title { text-align:center; font-size:22px; font-weight:600; color:var(--text-1); margin-bottom:18px; }
+.p10 .succ-amt { text-align:center; font-size:36px; font-weight:700; letter-spacing:-1px; }
+.p10 .succ-amt .yen { font-size:22px; vertical-align:6px; margin-right:2px; }
+.p10 .succ-merchant { text-align:center; font-size:13px; color:var(--text-2); margin-top:6px; margin-bottom:18px; }
+.p10 .succ-card { background:#fff; border-radius:14px; padding:18px 16px; margin:0 0 18px; box-shadow:var(--shadow-card); }
+.p10 .succ-row { display:flex; justify-content:space-between; align-items:center; padding:8px 0; font-size:14px; }
+.p10 .succ-row .k { color:var(--text-3); }
+.p10 .succ-row .v { color:var(--text-1); max-width:60%; text-align:right; word-break:break-all; }
+.p10 .succ-btn { display:block; width:100%; height:50px; border-radius:25px; background:#E5E6EB; color:var(--text-1); border:none; font-size:16px; font-weight:600; cursor:pointer; margin-top:6px; }
+
+/* ============ 自适应 ============ */
+@media (max-width:540px) {
+  .phones { grid-template-columns:1fr; gap:32px; }
+  .phone { height:min(760px, calc(100dvh - 100px)); border-radius:24px; }
+  .stage { padding:14px 10px 60px; }
+  .step-tag { font-size:11px; padding:3px 10px; }
+}
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="stage-head">
+    <div class="stage-title">校付通 × 微企付 · 缴费支付交互 Demo</div>
+    <div class="stage-sub">前 5 屏复刻校付通缴费流程，第 6 屏校付通收银台默认勾选「微企付」，进入后衔接微企付正式 4 步：选卡 → 工行确认 → 输密 → 支付成功。</div>
+    <div class="stage-tip">点击页面里的按钮即可顺序跳转；桌面端横排查看，手机端竖排查看；每屏顶部有蓝/绿/红标识当前步骤。</div>
+  </div>
+
+  <div class="phones">
+
+    <!-- ============ Page 1: 我的校付通 ============ -->
+    <div class="phone-wrap"><div class="step-tag blue">① 校付通 · 信息核对</div>
+    <div class="phone p1" id="p1">
+      <div class="phone-cap"></div>
+      <div class="statusbar"><div>中国联通 5G</div><div>下午 12:18 · 22%</div></div>
+      <div class="screen">
+        <div class="nav">
+          <div class="nav-l"><svg viewBox="0 0 24 24" width="22" height="22"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="#000" stroke-width="2" stroke-linecap="round"/></svg></div>
+          <div class="nav-t">我的校付通</div>
+          <div class="nav-r">···</div>
+        </div>
+        <div class="head-note">请您核对个人信息是否正确</div>
+        <div class="kid-card">
+          <div class="kid-head"><span class="kid-name">李三 学生</span><span class="kid-edit">修改资料</span></div>
+          <div class="cell"><span class="l">小孩姓名</span><span class="r">李三</span></div>
+          <div class="cell"><span class="l">小孩所在学校</span><span class="r">校付通价值联盟测试学校</span></div>
+          <div class="cell"><span class="l">小孩所在班级</span><span class="r">小四（7）班</span></div>
+          <div class="cell"><span class="l">亲属关系</span><span class="r">家长</span></div>
+        </div>
+        <div class="kid-card">
+          <div class="kid-head"><span class="kid-name">李霖 学生</span><span class="kid-edit">修改资料</span></div>
+          <div class="cell"><span class="l">小孩姓名</span><span class="r">李霖</span></div>
+          <div class="cell"><span class="l">小孩所在学校</span><span class="r">乐收银·校付通体验学校（南昌）</span></div>
+          <div class="cell"><span class="l">小孩所在班级</span><span class="r">赣州支行</span></div>
+        </div>
+        <div class="footer-pay"><button class="btn-primary" onclick="goNext('p2')">确认</button></div>
+      </div>
+    </div></div>
+
+    <!-- ============ Page 2: 微信会话列表 ============ -->
+    <div class="phone-wrap"><div class="step-tag blue">② 微信会话 · 校付通通知</div>
+    <div class="phone p2" id="p2">
+      <div class="phone-cap"></div>
+      <div class="statusbar"><div>中国联通 4G</div><div>下午 4:23 · 62%</div></div>
+      <div class="screen" style="background:#EDEDED;">
+        <div class="wxnav">
+          <div class="wxnav-row"><span>微信 (171)</span><span class="wxnav-add">+</span></div>
+          <div class="wxsearch">🔍 搜索</div>
+        </div>
+        <div class="chat-list">
+          <div class="placeholder-row"><div class="chat-avatar" style="background:#aaa;"></div><div class="placeholder-bar"><i></i><i></i></div></div>
+          <div class="placeholder-row"><div class="chat-avatar" style="background:#bbb;"></div><div class="placeholder-bar"><i></i><i></i></div></div>
+          <div class="chat-item" onclick="goNext('p3')">
+            <div class="chat-avatar xft"><div class="logo">校付通</div><div class="url">XFT123.COM</div></div>
+            <div class="chat-main">
+              <div class="chat-top"><div class="chat-name">校付通</div><div class="chat-time">下午 4:23</div></div>
+              <div class="chat-msg">待办任务提醒</div>
+            </div>
+            <div class="chat-badge">4</div>
+          </div>
+          <div class="placeholder-row"><div class="chat-avatar" style="background:#fbe2c4;"></div><div class="placeholder-bar"><i></i><i></i></div></div>
+          <div class="placeholder-row"><div class="chat-avatar" style="background:#d4e4f4;"></div><div class="placeholder-bar"><i></i><i></i></div></div>
+          <div class="placeholder-row"><div class="chat-avatar" style="background:#f8d3d3;"></div><div class="placeholder-bar"><i></i><i></i></div></div>
+          <div class="placeholder-row"><div class="chat-avatar" style="background:#d4d4d4;"></div><div class="placeholder-bar"><i></i><i></i></div></div>
+        </div>
+      </div>
+    </div></div>
+
+    <!-- ============ Page 3: 校付通会话内 ============ -->
+    <div class="phone-wrap"><div class="step-tag blue">③ 校付通 · 待办通知</div>
+    <div class="phone p3" id="p3">
+      <div class="phone-cap"></div>
+      <div class="statusbar"><div>中国联通 5G</div><div>下午 4:23 · 62%</div></div>
+      <div class="screen" style="background:#EDEDED;">
+        <div class="nav">
+          <div class="nav-l"><span class="back">‹ 106</span></div>
+          <div class="nav-t">校付通</div>
+          <div class="nav-r">👤</div>
+        </div>
+        <div class="msg-card">
+          <div class="msg-head"><span class="msg-title">待办任务提醒</span><span class="msg-more">···</span></div>
+          <div class="msg-sub">【19年上学期收费（一科一辅作业本校服）】审核通过</div>
+          <div class="msg-rows">
+            <div class="msg-row"><span class="k">待办内容：</span><span class="v">收费审核结果</span></div>
+            <div class="msg-row"><span class="k">待办时间：</span><span class="v txt">2020-02-20 00:50:21</span></div>
+            <div class="msg-row"><span class="k">备注：</span><span class="v">点击查看详情。</span></div>
+          </div>
+          <div class="msg-foot"><span>查看详情</span><span class="arrow">›</span></div>
+        </div>
+        <div class="msg-card" style="margin-top:12px; position:relative;" onclick="goNext('p4')">
+          <div class="msg-head"><span class="msg-title">待办任务提醒</span><span class="msg-more">···</span></div>
+          <div class="msg-sub">您好，李三家长，您有一个待处理的交费通知！</div>
+          <div class="msg-rows">
+            <div class="msg-row"><span class="k">待办内容：</span><span class="v">19年上学期收费（一科一辅作业本校服）</span></div>
+            <div class="msg-row"><span class="k">待办时间：</span><span class="v txt">2020年02月20日 00:50:21</span></div>
+            <div class="msg-row"><span class="k">备注：</span><span class="v txt">请尽快处理。（已交费的家长请忽略）</span></div>
+          </div>
+          <div class="msg-foot"><span>查看详情</span><span class="arrow">›</span></div>
+          <div class="finger" aria-hidden="true">👇</div>
+        </div>
+      </div>
+    </div></div>
+
+    <!-- ============ Page 4: 缴费详情 ============ -->
+    <div class="phone-wrap"><div class="step-tag blue">④ 缴费详情 · 选费目</div>
+    <div class="phone p4" id="p4">
+      <div class="phone-cap"></div>
+      <div class="statusbar"><div>中国联通 4G</div><div>上午 12:50 · 29%</div></div>
+      <div class="screen" style="background:#fff;">
+        <div class="nav">
+          <div class="nav-l"><svg viewBox="0 0 24 24" width="22" height="22"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="#000" stroke-width="2" stroke-linecap="round"/></svg></div>
+          <div class="nav-t">缴费详情</div>
+          <div class="nav-r">···</div>
+        </div>
+        <div class="breadcrumb"><span>‹ 首页</span><span>👤 李三</span></div>
+        <div class="pay-h1">19年上学期收费（一科一辅作业本校服）</div>
+        <div class="pay-sub">截止时间：2020-03-05 23:59:00</div>
+        <div class="pay-items">
+          <div class="pay-items-head"><span>已选（0）</span><span>合计：<span class="total">¥ 0.00</span></span></div>
+          <div class="pay-item"><div class="pay-radio"></div><div class="info"><div class="price">¥ 0.02 (可选)</div><div class="name">学费</div></div></div>
+          <div class="pay-item"><div class="pay-radio"></div><div class="info"><div class="price">¥ 15.00 (可选)</div><div class="name">书本</div></div></div>
+        </div>
+        <div class="pay-notice">通知详情</div>
+      </div>
+      <div class="footer-bar"><div class="btn no">不参与</div><div class="btn go" onclick="goNext('p5')">去支付</div></div>
+    </div></div>
+
+    <!-- ============ Page 5: 订单确认 ============ -->
+    <div class="phone-wrap"><div class="step-tag blue">⑤ 订单确认 · 学生身份</div>
+    <div class="phone p5" id="p5">
+      <div class="phone-cap"></div>
+      <div class="statusbar"><div>中国联通 4G</div><div>上午 12:50 · 29%</div></div>
+      <div class="screen" style="background:var(--bg);">
+        <div class="nav">
+          <div class="nav-l"><svg viewBox="0 0 24 24" width="22" height="22"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="#000" stroke-width="2" stroke-linecap="round"/></svg></div>
+          <div class="nav-t">订单确认</div>
+          <div class="nav-r">···</div>
+        </div>
+        <div class="stu">
+          <div class="stu-avatar"><svg viewBox="0 0 64 64" fill="none"><circle cx="32" cy="20" r="12" fill="#4A90E2"/><rect x="14" y="34" width="36" height="22" rx="6" fill="#5DADE2"/></svg></div>
+          <div><div class="stu-name">李三 &nbsp; 小四（7）班</div><div class="stu-school">校付通价值联盟测试学校</div></div>
+        </div>
+        <div class="order-box">
+          <div class="order-row"><span class="k">项目名称</span><span class="v">19年上学期收费（一科一辅作业本校服）</span></div>
+          <div class="order-row"><span class="k">支付金额</span><span class="colr"><div class="v price">¥0.02 ›</div><div class="hint">点击查看明细</div></span></div>
+        </div>
+        <div class="switch-box">
+          <div class="switch-text"><div class="t">分多笔支付</div><div class="s">开启此项可将支付金额拆分为多笔进行支付</div></div>
+          <div class="switch"></div>
+        </div>
+      </div>
+      <div class="order-foot"><button class="btn back">返回修改</button><button class="btn go" onclick="goNext('p6')">下一步</button></div>
+    </div></div>
+
+    <!-- ============ Page 6: 校付通收银台（默认微企付）============ -->
+    <div class="phone-wrap"><div class="step-tag blue">⑥ 校付通收银台 · 默认微企付</div>
+    <div class="phone p6" id="p6">
+      <div class="phone-cap"></div>
+      <div class="statusbar"><div>中国联通 4G</div><div>上午 12:50 · 29%</div></div>
+      <div class="screen">
+        <div class="nav">
+          <div class="nav-l"><svg viewBox="0 0 24 24" width="22" height="22"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="#000" stroke-width="2" stroke-linecap="round"/></svg></div>
+          <div class="nav-t">校付通收银台</div>
+          <div class="nav-r">···</div>
+        </div>
+        <div class="biz">
+          <div class="biz-name">19年上学期收费（一科一辅作业本校服）</div>
+          <div class="biz-sub">校付通价值联盟测试学校 · 小四（7）班 · 李三</div>
+          <div class="biz-amt"><span class="k">业务金额</span><span class="v">¥ 12,800.00</span></div>
+        </div>
+        <div class="method-card">
+          <div class="method-title">≡ 支付方式</div>
+          <div class="method-list">
+            <div class="method-row" onclick="selectPay('wqf')">
+              <div class="method-logo"><img src="data:image/png;base64,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" alt="微企付"></div>
+              <div class="method-info">
+                <div class="method-name">腾讯微企付（推荐） <span class="method-tag">支付前 5 笔最高领 20 元红包</span></div>
+                <div class="method-desc">腾讯旗下大额转账产品</div>
+              </div>
+              <div class="radio checked" id="r-wqf"></div>
+            </div>
+          </div>
+          <div class="expand-btn" id="expandBtn" onclick="toggleLegacy()">
+            <span id="expandText">展开更多支付方式</span><span class="ic"></span>
+          </div>
+          <div class="legacy" id="legacy">
+            <div class="method-list">
+              <div class="method-row" onclick="selectPay('wx')">
+                <div class="method-logo wx"><svg viewBox="0 0 32 32" fill="#fff"><circle cx="16" cy="16" r="12"/></svg></div>
+                <div class="method-info">
+                  <div class="method-name">微信支付（零钱、储蓄卡）</div>
+                  <div class="method-desc" style="color:var(--red);">免费, 推荐使用</div>
+                </div>
+                <div class="radio" id="r-wx"></div>
+              </div>
+              <div class="method-row" onclick="selectPay('wx-credit')">
+                <div class="method-logo wx"><svg viewBox="0 0 32 32" fill="#fff"><circle cx="16" cy="16" r="12"/></svg></div>
+                <div class="method-info"><div class="method-name">微信支付（支持信用卡）</div></div>
+                <div class="radio" id="r-wxc"></div>
+              </div>
+              <div class="method-row" onclick="selectPay('wx-friend')">
+                <div class="method-logo wx"><svg viewBox="0 0 32 32" fill="#fff"><circle cx="16" cy="16" r="12"/></svg></div>
+                <div class="method-info"><div class="method-name">微信好友代付</div></div>
+                <div class="radio" id="r-wxf"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="brand-foot"><div class="row"><span class="logo">校付通</span><span>校园缴费 · 首选品牌</span></div></div>
+      </div>
+      <div class="footer-bar" id="payBtn" onclick="goPay()">确认支付 ¥ 12,800.00</div>
+    </div></div>
+
+    <!-- ============ Page 7: 腾讯微企付（按参考图重做）============ -->
+    <div class="phone-wrap"><div class="step-tag">⑦ 腾讯微企付 · 选卡</div>
+    <div class="phone p7" id="p7">
+      <div class="phone-cap"></div>
+      <div class="statusbar"><div>18:07</div><div>● ● ● ●</div></div>
+      <div class="screen">
+        <div class="nav">
+          <div class="nav-l"><span class="back" onclick="goNext('p6')">‹</span></div>
+          <div class="nav-t">腾讯微企付</div>
+          <div class="nav-r"></div>
+        </div>
+        <div class="biz-head">
+          <div class="biz-name">创世纪 XX幼儿园</div>
+          <div class="biz-amt"><span class="yen">¥</span>12,800.00</div>
+        </div>
+
+        <div class="payer-card">
+          <div class="payer-l">
+            <span class="payer-label">付款户名</span>
+            <span class="payer-name">**博</span>
+            <span class="payer-tag">限定</span>
+          </div>
+          <div class="payer-r">
+            <span class="payer-dot"></span>
+            <span class="payer-arrow">›</span>
+          </div>
+        </div>
+
+        <div class="pay-section-bar">
+          <span class="l">选择付款方式</span>
+          <span class="r">联系客服</span>
+        </div>
+
+        <div class="wx-card" onclick="selectBank('wxbiz')">
+          <div class="wx-icon"><svg viewBox="0 0 32 32" fill="#fff"><circle cx="16" cy="16" r="12"/></svg></div>
+          <div class="wx-name">微信支付 ｜ 经营账户</div>
+          <div class="radio" id="b-wxbiz"></div>
+        </div>
+
+        <div class="bank-card">
+          <div class="bank-head">
+            <div class="bank-head-icon"><svg viewBox="0 0 18 14" fill="currentColor"><rect x="0" y="0" width="18" height="14" rx="2"/><rect x="0" y="3" width="18" height="2" fill="#3F8AE0" stroke="#fff" stroke-width=".5"/></svg></div>
+            <div class="bank-head-title">个人银行卡</div>
+          </div>
+          <div class="bank-row" onclick="selectBank('cmb')">
+            <div class="bank-logo"><img src="data:image/png;base64,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" alt=""></div>
+            <div class="bank-name">招商银行储蓄卡</div>
+            <div class="radio checked" id="b-cmb"></div>
+          </div>
+          <div class="bank-row" onclick="selectBank('icbc')">
+            <div class="bank-logo"><img src="data:image/png;base64,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" alt=""></div>
+            <div class="bank-name">工商银行储蓄卡</div>
+            <div class="radio" id="b-icbc"></div>
+          </div>
+          <div class="bank-row" onclick="selectBank('boc')">
+            <div class="bank-logo"><img src="data:image/png;base64,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" alt=""></div>
+            <div class="bank-name">中国银行储蓄卡</div>
+            <div class="radio" id="b-boc"></div>
+          </div>
+          <div class="bank-row" onclick="selectBank('ccb')">
+            <div class="bank-logo"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAUAAAAFACAYAAADNkKWqAAAACXBIWXMAAG66AABuugHW3rEXAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAOdEVYdFNvZnR3YXJlAEZpZ21hnrGWYwAAGGVJREFUeAHt3TtsXNeZwPHvXkqUumg7byQ7E2SLdKYKAxQRQ9Rjs05lqUsq0d2mCl3tRqKWJCTKTmW5WqTSqFq4ElUtUlgkgUCk14WpLl3GCBF4K9OdPSTvzfnuaCQ+huRw5j6+c+7/B8iS8oAhPv46r3uuCAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAcIxLAN+OzDYlOjYnEP5E4bUganXNfyfpzo/M/SM+5f5zr/X+OWp2f0s7Pqbif9dfR1xInLTm1vS7L85uCWiCAsG1iYcxF6rL7SnXBiyZdrBpSvE3371t3/651SVwwR5IX8ue7y4LgEEDYko3uRt+XWG648LnoHTaSq0Aky50opityZnuZkaL/CCCqp9GLR6fcV+NlF71J8YUGMU2X3TR8hRGinwggqjE5e05+GL31cqQ3Kb7TtUQNYpw8Job+IIAol4avPTrtfvU7sTS9zZPGME3mZO3uY4FpBBDlqEP49iOE5hFAFKuO4duPEJpFAFGcX9yblGTkUUlHV+wjhOYQQBSju8kRpZ1RX+RGf6n7tR5WjiL9zxpS5xHhttyUL++sCypFAFGdLJJn3pYo0Sc53GhRxlwcbZ39K1ZTkva8rM23BJUggLDnnYUxOZ0dgr5c4tMf1WBaXCkCCPuyIKbvuy/XG+53YxKiVA9Vtz9gNFguAgi/dEaHvwt0ZLjp1knnZXXmoaAUBBD+mliYcsFwGy0aw4AwGiwNAcReevuKTjNT+VHnBhZ5uWOrO7fHjbiiVnbNVKq3qbifuzepFH3F1KUHl92/b8r9akpCwdpgKQhgne25aurVj6KsZz+SZFlke6WQ0Y2GUFw0whoRzsvzO3OCQhDAOuleNRVllw/ojyqPm6y7+DbdVO9p7jHUqbFEs8GsEWajwfYVpsT5I4Chy57GiCfdp/qW2SDoLSo7STPX6Z6eMdw6M+vWCKclBJ0psVsX5KaZPBHAEL2KnmfP33aulHosSbuZ22hn3H0s4qAex2NKnCMCGIqw7tfTDZNPcwvh+Edu6p9+4n7ckBCk0UNZvf2hYGgE0Hc62kuj992PKQntEbK8d0LH789KHM1JGNZl1K0Lci3/UAigr7LwxbNB3KZ8nDw3AS7dn3a7xJ9ICNgcGRoB9I3ucEZubS8N9JGwo+Wz/jXuPoaxPJIQEMGhEEBfhHa0Y3BNF8EPZFiMBCEE0D7C10s+EQxpTVAjeKZ9kTXBkyGAVtVpjW8wRPAgNkZOiABao0c2RpJHhK8vRPAgIngCIwIb9Bzfj3/5nxKlT6RzXTyONyZvXmvI3549lWFsPFuR81clkGeI35DtkZ+7P9NngmMRQAt0urt9+n/dr8I4qFsuIrhfJD/P5WNSAwSwSjrq++d/+x/3Ffux1PUFQfkgggeNEcHjEcCqXLp3Q5JTSy+vosLwiOBB+jGJ3MdkWdATASybbnK8dfUT9w2mo76zgjwRwYMmieDhCGCZLj2Yljh1U14ZFxSFCB5EBA9BAMugmxwXrj9x090pYdRXBiJ4EBHsgQAWqXO05WNJo/8WPZ6AMhHBg4jgPgSwKK+PtrwnqAoRPGhSzl9pycbSCwEBLMTEwsOXoz6OtlSPCO4XRTeIYAcBzFNnh3dJONBsDRHcTyN44coLF8G/SI0RwLy83uFtCCzKL4JvXdeRvf87+VH0nrxx7U/y92ffSE1xGcKwdKOjPTonnRcQwb6c7hN80JQovSX+25QtuSJf3lmXGmIEOAyd8iYxz/D6JZ+nIzY+X5QL138awJM8Z10Ffi3n3/1MNlZqd4MMARyU7vKK6HpfQ+CbSSK4x1mXArcm+O7TukWQAA5iYmHO7fLqOyU41OwvIrhbpCcW6hdBAnhSesRF5D8EISCCu9UwgmyC9Es3O7ZGn3BTc5DyedtcKBsjNXrJEiPAfmSbHSOrIlxdFShGgrt1R4L/8u5jaa18LwFjBHgcjV+cLvFWtlrIZyQ4sfCVhPGXZfDvF4kFh3tnYYz41cpstsE1LI2GxsN/Y9IeXcqWfwLFFPgwGr/T2TEXbnGpl+Gnwzpt/Nm7n8nOiF6E4fvXzxvuz/FGqFfrE8BeXsePywzqiQjuFez7RQjgfsQPHURwryAjSAB3I37YiwjuFdxLlghgF/FDb0Rwr6BulSaASo+6nBK91IAND/RCBPcKJoIEkHN+6E8+ETz/r3+SKLs9yPeZRhARrHcA9XxT9oQH8UNfhv+m3/h8U85ffxpMBC9c/U42nq2Jp+odwB//Uh9v+7kA/SOCu+mt0h6/X6S+Aezc6sJFphgEEdzN45cs1TOAnceduNIKwyCCu3UiuOIi2BKP1O8yhEv3bkgUPxEgH8NfoBDORpx37xepVwDZ8UUxiOBrXkWwPgHM3t525ivih4IQwdc2JWlf9OFC1fpch5W9upL4oTDDX6W19vuWJNEVNy5pid/OSTS6JOOzDTGuHgHUl5bz3l4Ujwh2RdLwIYLhT4GzaUWiN/TyjC/KwnS4y/j7RcIfAWZfRMQPpWIk2GV8JBh2ALMvQtb9UAki2KURjEefWLxaP9wpcGfq+1cBqsV0+DVzL1kKdwTYmfoCVWMk+Jq5lyyFGUCmvrAlnwhupTdFz9j5TSP4iRgR3rPAOl2IUh51gzXDPzv892ffyBvX/uS+a3/tfndW/GXm/SLhjQCZ+sKu4UeC+oiZPmrm/0hwSsbvTUrFwgogU1/YRwRVkkzJ2t1lqVg4U+DO1PeR+D01QD3Uezrcid9jMSCcEWCczAoHnuGPeo4EDcVPhXEOcGJhzP3zKwH8M/w5QV9e6WosfiqQEWDEri98ledI0C6D8VP+rwFOLEyJ7igB/spnTfD8ta9fXq9vi9H4Kf8D+OZ1Hf2x9mffpiTpx27SMec2qxbdqP170fNg6MrhHSPP1s1F0HD8lN9rgJ3R3yOBbYddidT5/OlTAfwF9loOzw67j2ts4PvCePyUvwHkint/pNGkrN5e6fnfcV9jL/5H0IP4KX83Qdqj08TPA/qNcFj8VPaMaxBPNuQph2eH7zQlkQ+kCp7ET/m5BpgdembqZF6/3wjhPOOaJz/XBD2Kn/JzBBgnk4z+jDvpN0I4z7jmya+RoGfxU36OANn5tW3QbwRGgr3kMxK8cPU7iaL3pCgexk/5F0DO/dm2I9PyxcwfZVCvIph9s/KXXEceEVyT81fdtqfbkMqbp/FT/gWQ0Z9dSTrn4vcHGVZ2qPf605drV3yuO/KI4EruEfQ4fsqvADL6s0vjtzYzL3nZ+HyTCB5gK4Kex0/5FcC3runOb0NgS97x6yKCvdiIYADxU/4EsHPjy8cCW4qKXxcR7KXaCAYSP+VPAN+89pHw7KgtRceviwj2Uk0EA4qf8iOAnduemwI7yopfFxHsZTI73qI7vIM6SQQDi5/y4yB0dvAZZpQdv65w3o+bnyj6RMbv3ZJh6OdSP6dHCTB+yo8RIEdf7Kgqfl2MBA+Kohty/kpLNpZeyKCOGgkGGj9lfwT4C311Ho+9mVB1/LoYCR4Ux81CRoIBx0/ZD2ASD/dJRT6sxK+LCB6UdwQDj5+yfx/gxIO/MgKsmLX47ZbdJ5gu8TWySx7h0hct6QUVgbMdwHfv3ZCdmBceVSlNH8rqzIdiWXY57qi+FY1jUl01GL3lwfYUeCd+X1Clpvn4qeX5TRlt61VawY9Y+pbHdLgG7I4AO3+rfyuoSlOe36nmRuFBMRI8iJHgkeyOANuj9l7vVx/+xU8xEjyIkeCRLE+BLwuq4Gf8uojgQUTwUJYDyAiwfH7Hr6sbwTRaFHQQwZ5srgHq4eckXhKUad3F76KE5tKDpkQp3/hdrAnuYXMEyOHnsq2/nDaGZ/X2lBsJ8g3fxUhwD6NT4ALeW4DDdOKn08ZQEcG94nhakLEXwOziU071lyT8+HURwa5mkEsdA7I4AuQMVznqE78uIhjGJleOLAaQpz+KV7/4dWkEj7v7LkzErweLAZwUFCeVliTtm7WMX1c/F4CGhfgdwtaFqHr8JY3+XVAMjV/qRn5r8y2puyLekWtR5zKL3wp6sjUC3InfFhSD+B0U+khQ/2w+XGZRIVsBjJj+FoL4HS7UCFq+w9EQa2uAk4J8Eb/jhRZB4tc3O2uAnRefc0AzT8Svf6GsCRK/E7EzAhxJGoL8EL+T830kSPxOzE4AkxGuv8oL8RucrxEkfgMxtAaY8gRIHojf8HyLIPEbmJ0ApjwCNzTilx9fIkj8hmLjPkDe/zE84leMS/en3cbIJ2IRd/sNzcYIcPsUo79hEL/irM48lETsPUZG/HJhI4A8ATKMTdmWm8SvQGt3mqYiSPxyYyOAcdQQDGJTtuSKfHmHFwAVzUoEiV+ujGyCsAM8AOJXtmojuClpNEn88mUjgGnUEJwE8avK6wiWeZ1Y5/O9entFkCsrI8CGoF/Er2oaQf0clBNBPt8Fqj6A4x81BP3jm8EG/RwUH0HiV7DqA3hquyHojy6A881gR5ER1KNNxK9w1QcwknOC47H7Z1MREeye6yR+has+gDsxATwO8bMtzwhyqL1UBjZB0p8IDkf8/KARTOKLbkrTkkERv9JZfCscuoifX9Z+35IkujJQBIlfJQigVTsyTfw8NEgEiV9lCKBFesXRF3c+FfjpJBEkfpUigNZwv1sYXkXwiI0R4lc5AmgJ8QtLFkHp/V5e4mcCAbSC+IVJH5tLk5vuV90zfZvZ5/pM+yLxq94pqVoabRq5l7piW2x4hGr17qL756LAHAtPgnwnaDIaAMpX/QgQuh7EI0910nkHTkPi5PVTUEnspsbtMq/YKt9ZN/1fnjf1ZySAJkQEsA4mFqbcjOeWtGUy+32ybwIWj0rQ2tlb9kytc1cfwDhpHfhCqJt4p+H+yWWXodIr30aSR26kP+l+wBB2gS1I4ilBuOJ0KYsfzKk+gNunWlJ3kfvmmFiYE4Qn+7xy47lVjADtmJVLD2y+gBuD6fylNiswq/oAnv0+7J2vk4jSafdN80jgP+J3kJ75Nab6ABrbFjdgigh6jvj1FicEsLchLpEMExH0FfE7HCPAQ0Qpo8CDiKBviN/R0pgA9qQ3Y6AXIugL4ne87dTcY69WdoEZAR6OCFpH/PpzOv1WjDESwLQlOAoRtIr49e/5zNdijJVNEHMfGIOIoDXE7yRMzvJsBHDE3va4UUTQCuJ3Ui0xyEYAt05xG0r/iGDVLj2YFuJ3MkY3Om0EUN+dgJMgglUZ1yutUh5ZPKnY5jq/oWeBOQx9QkSwbBq/WPiYDyKx+f1tKIAp0+CTI4JlIX7DiRgBHi1iBDggIlg04je8LZsnPewEMOEs4BCIYFGIXz6+vGNyhmcngGnyQjAMIpg34pcXs8tbdgJ4dps1wOERwbwQv/wYftbfTgCzewFZB8wBERwW8ctXZHeD09iV+OwE54QIDor4FYEA9oWd4DwRwZMifsUwugOsbAUw3uHduPkigv0ifkXZtLoDrGwFcGR7WZA3Ingc4lec1Paylq0AshFSFCJ4GOJXrNju+p8y+F7gdFlQBCK4H/ErXirLYpi9AKa2/8bwHBHsIn7lSLZMP+BgL4CRsBFSLCJI/MqyLmvzLTHMXgCfZztG3BBdrPpGkPiVyfxszuAaYGZZULT6RZD4lStJlsU4mwE0vnAakPpE8NK9G8SvbNvml7OMBjB+KihL+BF8Z2FMopj4lcv8+p+yGcDsHSGcByxRuBHU+J2WJferc4LyRH4cZ7O6Bqi7wYuCMoUXQeJXnST24vvXbgB3dpgGly+cCBK/Km3K6m0vjrPZDWDnglSOw5TP/wgSv2p5tIlpN4D6XDBPhVTF3wgSv+qliTfLV3YDqCJ5LKiKfxEkfkbYP/7SZTuAo239m4RpcHX8iSDxsyF1u78eHH/psh1ApsEW2I8g8bMjTZviEdsBVEyDLbAbQeJnjD/TX2U/gEyDrbAXQeJnSyqLPk1/lf0AZrdEcyjaCDsRJH72eLT722U/gCpJmAbbUX0EiZ89+vLztbvefZ/6EcC1u8vCNNiS6iJI/GyK/LzByY8AZtKHAkvKjyDxs2tLPhUP+RPA0S0vP8CBKy+CxM8uPftn+N2/R/EngJ0zgcsCa4qPIPGzzbOzf7t5NAUW3WWaF1hUXASJn22ebn50+RVA3QxhFGhV/hEc/6hB/KyLvD6i5lcAFU+GWJZfBDV+cUr8rEt/8HptPhIfTSx8K3xjWNaU53c+kEG9il/aEFg23OfZAP9GgBmOxBg3+EiQ+PkjaXu/Ju9nADtHYjgYbdvJI0j8fNL07bnfXkbER62V7+XNq2fdDH5SYNmYvHmtIX97dvz7XYifX5L2TdlY8X4Q4ukUWBgF+mNKLt2fPvJ/Qfx8E8ToT/k5AlSMAv0RRe/J+Sst2Vh6ceC/I37+CWT0p/wdASpGgf6I46ZbE5zb858RPx8FM/pTfh6D2W3i/qz7Y8wJ/KBPDkSy7n6cc7+eFPglaf80pACeEt/pKLB9ZopRhCciabh/Nlz84Js0fRhS/JTfU2CVXZKw86EAKI6O3NPwbmTyP4Bq9e4izwgDBUqTudBGfyqMACpuigGK4fmNL0cJJ4B6U0wU8YgckLe0fUUCFU4A1ekfdBTIsRggP0Ede9kvrABmGyIpU2EgDzr1DeDCg6P4fw6wl0sLS+5PNikABpckU6Gu/XWFNQLsSmO9o4ypMDC4ZujxU2EGcO33LabCwIBqMPXtCnMK3MVUGDi5NJqU1dsrUgNhjgC7mAoDJ5Okc3WJn/L3Oqx+bHy+Keev/b8bBd4QAEfLDjzP3JQaCXsEqNbuNDkgDRwje9Y33APPhwk/gCo7IB21BMAhkg9DPvB8mHoEUA9Ib6U6tGc9ENgvW/e76/ULzgcV9hrgbn9/9o1cuPpDdj07gI40WnTLRL+VmqpPANXGszV567q+UH1cgLrTdb8z7V9l79epqbDPAR5mYuEr0Vc2AnXV3fSo4brfbvVYA9wviW+yKYIa2yR+HfUcAarsjWSJjgTPCVAnW3JRvryzLqjpCFDp88JJUqtDn0B2wwvxe6VemyD7bSy13M7wd+wMoxZ2ZFq+mPmj4JV6B1DpzvD5q24xIJoUIFR61u+LmT8I9iCAauPZChFEsDR+azNcD9cDAezSCF64/lO3LcTxGISjM+1l5HcIArjbxueLRBDB0A0P1vyORAD3I4Lw36akyW9k7e5ngiMRwF6IIHylT3hsy6/cyG9ZcCwCeBgiCN90H2/7v//6i6AvBPAoGkF2h+GDNF2WM1tX5M/z3wj6RgCPwxEZ2NeU1Zmbdb7VZVAEsB9EEFZll5nOfCgYCAHsVxbBa1+/fM3mWQGqxgHnodX3NphBvbMwJqejJ27RpSFANTYlSaZl7e5jwVAI4CCyq7TSJSKI0nWOudzkRpd8MAUehL5v+Ge/eCzJKZ0Kc70+yqE7venWTY655IcR4LDG789KHM0JUKQ0fchmR/4IYB5YF0Rx9LG2D+r62sqi1fdG6DzpekwSXXHrM8sC5EWnvEn7IvErDiPAvDElRh444lIKAlgEdokxKN3llWhKVm+vCApHAIvEaBAnoRsdZ7bmZXl+U1AKAlg0RoM4DqO+yhDAsjAaRC+61nd261NGfdUggGXqvIz9ifsVdwzWXedQ8weyNt8SVIYAVmFiYcp96GeZFtcSz/EawqNwVfjbs/XsUbqt+Huu2KoNF770Y7fJ8Rv58+wXAhMYAVatMy12o0GZEoSqKUl7numuPQTQCkIYHl3nk3iO3V27CKA1hNB/hM8bBNCqVyHUNUI2S7xA+LxDAK2bnD0n7dEb7le/E47P2ET4vEUAfXLpwWWJ0ilhemxFU9KoSfj8RQB9xPS4Snqc5SFPb4SBAPpOD1Wn6S3OExZMp7mRPJTnM08FwSCAodBRoezckjieYlSYm85oL3ZT3eczXwuCQwBD9GqtkCnyADbdx64pSbzI2l74CGDoiGE/3FpesijpSFPO/PCCtb36IIB1kr28KX1fUplkzVBa7i+GRUZ69UYA6yo7X3j6svsS0DOGYxL+GcOXo7x4PQsfa3oQAoiu7GjNztvuK2JSEhdD/0eILRc8t3M7siyp+5ngoQcCiMNlU2aNYfr2yyjqKPGc2KLrdS0Xu/VsdCfROut46BcBxMno1PmHM26kmGgIx7KNlTRquDjq7xuSfyA3sx9pqmt27kfkfu9Clyb6n68zssMwCCDyN3H/J7IV/ZOcin6U/V5jGcXHh1Gjlsabsp1+5zZrvpXRre8YyQEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgBL9A3l6s2N8R6KvAAAAAElFTkSuQmCC" alt=""></div>
+            <div class="bank-name">建设银行储蓄卡</div>
+            <div class="radio" id="b-ccb"></div>
+          </div>
+          <div class="show-more">显示更多银行</div>
+        </div>
+
+        <div class="wx-card" onclick="selectBank('friend')">
+          <div class="wx-icon" style="background:#5C6BFF;"><svg viewBox="0 0 22 22" fill="#fff"><circle cx="11" cy="8" r="4"/><rect x="3" y="14" width="16" height="6" rx="3"/></svg></div>
+          <div class="wx-name">分享给好友付款</div>
+          <div class="radio" id="b-friend"></div>
+        </div>
+
+      </div>
+      <div class="pay-btn-wrap"><button class="pay-btn" onclick="goNext('p8')">付款</button></div>
+    </div></div>
+
+    <!-- ============ Page 8: 工商银行 · 安全支付（截图1 - 第2屏）============ -->
+    <div class="phone-wrap"><div class="step-tag red">⑧ 工商银行 · 安全支付</div>
+    <div class="phone p8" id="p8">
+      <div class="phone-cap"></div>
+      <div class="statusbar dark"><div>9:43</div><div>● ● ● ●</div></div>
+      <div class="screen" style="background:#F4F5F7;">
+        <div class="icbc-nav"><div class="seal" style="color:#E60012;">招</div><div class="title">招商银行 · 安全支付</div></div>
+        <div class="secure-bar">
+          <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1l5 2v4c0 3.5-2 6.5-5 8-3-1.5-5-4.5-5-8V3l5-2zm0 4.5L5 9l3 3 3-3-3-3.5z"/></svg>
+          腾讯微企付 · 安全支付保障
+        </div>
+        <div class="icbc-table">
+          <div class="icbc-row"><span class="k">收款方</span><span class="v">创世纪 XX幼儿园</span></div>
+          <div class="icbc-row"><span class="k">金额</span><span class="v amt">¥12,800.00</span></div>
+          <div class="icbc-row"><span class="k">付款账户</span><span class="v">招商银行 **** 6228</span></div>
+          <div class="icbc-row"><span class="k">收款账户</span><span class="v">交通银行 **** 1888</span></div>
+          <div class="icbc-row"><span class="k">交易类型</span><span class="v">扫码转账</span></div>
+          <div class="icbc-row"><span class="k">备注</span><span class="v" style="font-family:'SF Mono',Menlo,monospace; font-size:13px;">WQF20260429001388</span></div>
+        </div>
+        <div class="icbc-warn"><span class="ic">!</span><span>点击付款后需验证支付密码</span></div>
+      </div>
+      <div class="footer-bar" onclick="goNext('p9'); startAutoPwd();">确认付款</div>
+    </div></div>
+
+    <!-- ============ Page 9: 输入支付密码（截图1 - 第3屏）============ -->
+    <div class="phone-wrap"><div class="step-tag red">⑨ 工商银行 · 输入支付密码</div>
+    <div class="phone p9" id="p9">
+      <div class="phone-cap"></div>
+      <div class="statusbar"><div>9:43</div><div>● ● ● ●</div></div>
+      <div class="screen">
+        <div class="body">
+          <div class="icbc-pill"><span class="seal" style="color:#E60012;">招</span><span>中国招商银行 · 安全支付</span></div>
+          <div class="pwd-tip">请输入支付密码</div>
+          <div class="pwd-amt"><span class="yen">¥</span>12,800.00</div>
+          <div class="pwd-merchant">收款方：创世纪 XX幼儿园</div>
+          <div class="pwd-dots" id="pwdDots"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+          <div class="pwd-feed"><span class="dot"></span><span>正在自动输入密码…</span></div>
+          <div class="keypad">
+            <div class="key">1</div><div class="key">2</div><div class="key">3</div>
+            <div class="key">4</div><div class="key">5</div><div class="key">6</div>
+            <div class="key">7</div><div class="key">8</div><div class="key">9</div>
+            <div class="key disabled"></div><div class="key">0</div>
+            <div class="key"><svg viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="1.6"><path d="M3 12l5-5h12v10H8z"/><path d="M11 9l5 6M16 9l-5 6"/></svg></div>
+          </div>
+        </div>
+      </div>
+    </div></div>
+
+    <!-- ============ Page 10: 支付成功（截图2）============ -->
+    <div class="phone-wrap"><div class="step-tag">⑩ 支付成功</div>
+    <div class="phone p10" id="p10">
+      <div class="phone-cap"></div>
+      <div class="statusbar"><div>9:44</div><div>● ● ● ●</div></div>
+      <div class="screen" style="background:var(--bg);">
+        <div class="nav"><div class="nav-l"></div><div class="nav-t">支付成功</div><div class="nav-r"></div></div>
+        <div class="succ-body">
+          <div class="succ-icon-wrap"><div class="succ-icon"></div></div>
+          <div class="succ-title">支付成功</div>
+          <div class="succ-amt"><span class="yen">¥</span>12,800.00</div>
+          <div class="succ-merchant">创世纪 XX幼儿园</div>
+          <div class="succ-card">
+            <div class="succ-row"><span class="k">支付方式</span><span class="v">个人卡支付</span></div>
+            <div class="succ-row"><span class="k">付款账户</span><span class="v">招商银行 **** 6228</span></div>
+            <div class="succ-row"><span class="k">订单编号</span><span class="v" style="font-family:'SF Mono',Menlo,monospace;font-size:13px;">WQF20260429001388</span></div>
+            <div class="succ-row"><span class="k">完成时间</span><span class="v" id="succTime">2026-04-29 09:44:22</span></div>
+          </div>
+          <button class="succ-btn" onclick="resetDemo()">返回重新体验</button>
+        </div>
+      </div>
+    </div></div>
+
+  </div>
+</div>
+
+<script>
+let pickedBank = "cmb";
+let pickedPay  = "wqf";
+
+function goNext(id) {
+  const target = document.getElementById(id);
+  if (target) {
+    const wrap = target.parentElement;
+    wrap.scrollIntoView({behavior:"smooth", block:"center"});
+    flash(target);
+  }
+}
+
+function flash(el){ el.style.outline="3px solid rgba(7,193,96,.55)"; setTimeout(()=>el.style.outline="",700); }
+
+function selectPay(key) {
+  pickedPay = key;
+  ["wqf","wx","wxc","wxf"].forEach(k => {
+    const el = document.getElementById("r-" + k);
+    if (el) el.classList.remove("checked");
+  });
+  const map = { wqf:"r-wqf", wx:"r-wx", "wx-credit":"r-wxc", "wx-friend":"r-wxf" };
+  const id = map[key];
+  if (id) document.getElementById(id).classList.add("checked");
+}
+
+function toggleLegacy() {
+  const lg = document.getElementById("legacy");
+  const bt = document.getElementById("expandBtn");
+  const tx = document.getElementById("expandText");
+  lg.classList.toggle("open");
+  bt.classList.toggle("open");
+  tx.textContent = lg.classList.contains("open") ? "收起其它支付方式" : "展开更多支付方式";
+}
+
+function goPay() {
+  if (pickedPay === "wqf") {
+    goNext("p7");
+  } else {
+    fillSuccess("微信支付");
+    goNext("p10");
+  }
+}
+
+function selectBank(key) {
+  pickedBank = key;
+  ["cmb","icbc","boc","ccb","wxbiz","friend"].forEach(k => {
+    const el = document.getElementById("b-" + k);
+    if (el) el.classList.remove("checked");
+  });
+  const el = document.getElementById("b-" + key);
+  if (el) el.classList.add("checked");
+  const cardMap = {
+    cmb:   "招商银行 **** 6228",
+    icbc:  "工商银行 **** 6228",
+    boc:   "中国银行 **** 5566",
+    ccb:   "建设银行 **** 3355",
+    wxbiz: "微信支付 · 经营账户",
+    friend:"好友代付"
+  };
+  const navMap = {
+    cmb:   ["招商银行 · 安全支付", "招", "#E60012"],
+    icbc:  ["工商银行 · 安全支付", "工", "#C8000A"],
+    boc:   ["中国银行 · 安全支付", "中", "#A20A0A"],
+    ccb:   ["建设银行 · 安全支付", "建", "#0052D9"],
+    wxbiz: ["微信支付 · 安全支付", "微", "#07C160"],
+    friend:["好友代付 · 安全支付", "友", "#5C6BFF"]
+  };
+  const acctEl = document.querySelector("#p8 .icbc-table .icbc-row:nth-child(3) .v");
+  if (acctEl) acctEl.textContent = cardMap[key] || "招商银行 **** 6228";
+  const sucAcct = document.querySelector("#p10 .succ-row:nth-child(2) .v");
+  if (sucAcct) sucAcct.textContent = cardMap[key] || "招商银行 **** 6228";
+
+  const navInfo = navMap[key];
+  if (navInfo) {
+    const titleEl = document.querySelector("#p8 .icbc-nav .title");
+    const sealEl  = document.querySelector("#p8 .icbc-nav .seal");
+    const navWrap = document.querySelector("#p8 .icbc-nav");
+    const pillTitle = document.querySelector("#p9 .icbc-pill span:last-child");
+    const pillSeal  = document.querySelector("#p9 .icbc-pill .seal");
+    const pillWrap  = document.querySelector("#p9 .icbc-pill");
+    if (titleEl) titleEl.textContent = navInfo[0];
+    if (sealEl)  { sealEl.textContent = navInfo[1]; sealEl.style.color = navInfo[2]; }
+    if (navWrap) navWrap.style.background = `linear-gradient(180deg, ${navInfo[2]} 0%, ${navInfo[2]} 100%)`;
+    if (pillTitle) pillTitle.textContent = "中国" + navInfo[0].replace(" · 安全支付", "") + " · 安全支付";
+    if (pillSeal)  { pillSeal.textContent = navInfo[1]; pillSeal.style.color = navInfo[2]; }
+    if (pillWrap)  pillWrap.style.background = `linear-gradient(180deg, ${navInfo[2]} 0%, ${navInfo[2]} 100%)`;
+  }
+}
+
+function startAutoPwd() {
+  const dots = document.querySelectorAll("#pwdDots i");
+  dots.forEach(d => d.classList.remove("filled"));
+  dots.forEach((d, i) => setTimeout(() => d.classList.add("filled"), 600 + i * 240));
+  setTimeout(() => {
+    fillSuccess("个人卡支付");
+    goNext("p10");
+  }, 600 + 6 * 240 + 700);
+}
+
+function fillSuccess(method) {
+  const methodEl = document.querySelector("#p10 .succ-row:nth-child(1) .v");
+  if (methodEl) methodEl.textContent = method;
+  const d = new Date();
+  const pad = n => String(n).padStart(2, "0");
+  const t = d.getFullYear() + "-" + pad(d.getMonth()+1) + "-" + pad(d.getDate()) + " " +
+            pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+  document.getElementById("succTime").textContent = t;
+}
+
+function resetDemo() {
+  selectPay("wqf");
+  selectBank("icbc");
+  const lg = document.getElementById("legacy");
+  const bt = document.getElementById("expandBtn");
+  const tx = document.getElementById("expandText");
+  if (lg.classList.contains("open")) { lg.classList.remove("open"); bt.classList.remove("open"); tx.textContent = "展开更多支付方式"; }
+  document.querySelectorAll("#pwdDots i").forEach(d => d.classList.remove("filled"));
+  goNext("p1");
+}
+</script>
+</body>
+</html>
